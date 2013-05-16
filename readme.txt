@@ -3,8 +3,8 @@ Contributors: maximevalette
 Donate link: http://maxime.sh/paypal
 Tags: google, analytics, ga, post, pageviews, counter, visits
 Requires at least: 3.0
-Tested up to: 3.5.0
-Stable tag: trunk
+Tested up to: 3.5.1
+Stable tag: 1.0.1
 
 Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 
@@ -21,6 +21,9 @@ Therefore you can easily include this number in your blog for yourself or all of
 3. Configure from the new Post Pageviews Settings submenu
 
 == Changelog ==
+
+= 1.0.1 =
+* Fixed a bug that prevented the token refresh.
 
 = 1.0 =
 * First version. Enjoy!

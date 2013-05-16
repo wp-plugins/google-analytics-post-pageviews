@@ -5,7 +5,7 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.0
+Version: 1.0.1
 */
 
 define('GAPP_TEXTDOMAIN', 'google-analytics-post-pageviews');
@@ -39,21 +39,17 @@ function gapp_api_call($url, $params = array()) {
 
     if ($now > $options['gapp_expires'] && !empty($options['gapp_token_refresh'])) {
 
-        ob_start();
-
         $ch = curl_init();
 
-        curl_setopt($ch,CURLOPT_URL,'https://accounts.google.com/o/oauth2/token');
-        curl_setopt($ch,CURLOPT_POST,1);
-        curl_setopt($ch,CURLOPT_POSTFIELDS,'client_id='.$options['gapp_pnumber'].'.apps.googleusercontent.com&client_secret=zeg4fqbBrvYNvES0aErTHW6a&refresh_token='.urlencode($options['gapp_token_refresh']).'&grant_type=refresh_token');
+        curl_setopt($ch, CURLOPT_URL, 'https://accounts.google.com/o/oauth2/token');
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, 'client_id='.$options['gapp_pnumber'].'.apps.googleusercontent.com&client_secret='.$options['gapp_psecret'].'&refresh_token='.urlencode($options['gapp_token_refresh']).'&grant_type=refresh_token');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
-        $result = curl_exec($ch);
+        $data = curl_exec($ch);
         curl_close($ch);
 
-        $data = ob_get_contents();
         $tjson = json_decode($data);
-
-        ob_end_clean();
 
         $data = file_get_contents('https://www.googleapis.com/oauth2/v1/userinfo?access_token='.urlencode($options['gapp_token']));
         $ijson = json_decode($data);
@@ -247,6 +243,8 @@ function gapp_conf() {
     } else {
 
         echo '<p>'.__('You are connected to Google Analytics with the e-mail address:', GAPP_TEXTDOMAIN).' '.$options['gapp_gmail'].'.</p>';
+
+        echo '<p>'.__('Your token expires on:', GAPP_TEXTDOMAIN).' '.date('m/d/Y H:i:s', $options['gapp_expires']).'.</p>';
 
         echo '<p><a href="'.admin_url('options-general.php?page=google-analytics-post-pageviews/google-analytics-post-pageviews.php').'&state=reset">'.__('Disconnect from Google Analytics').' &raquo;</a></p>';
 
