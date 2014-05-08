@@ -44,7 +44,7 @@ function gapp_api_call($url, $params = array()) {
 
         curl_setopt($ch, CURLOPT_URL, 'https://accounts.google.com/o/oauth2/token');
         curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, 'client_id='.$options['gapp_pnumber'].'.apps.googleusercontent.com&client_secret='.$options['gapp_psecret'].'&refresh_token='.urlencode($options['gapp_token_refresh']).'&grant_type=refresh_token');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, 'client_id='.$options['gapp_clientid'].'&client_secret='.$options['gapp_psecret'].'&refresh_token='.urlencode($options['gapp_token_refresh']).'&grant_type=refresh_token');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
         $data = curl_exec($ch);
@@ -81,7 +81,15 @@ function gapp_conf() {
 
 	$options = get_option('gapp');
 
-    if (!isset($options['gapp_pnumber'])) $options['gapp_pnumber'] = null;
+	if (!isset($options['gapp_clientid'])) {
+		if (isset($options['gapp_pnumber'])) {
+			$options['gapp_clientid'] = $options['gapp_pnumber'] . '.apps.googleusercontent.com';
+		} else {
+			$options['gapp_clientid'] = null;
+		}
+	}
+
+	if (isset($options['gapp_pnumber'])) unset($options['gapp_pnumber']);
     if (!isset($options['gapp_psecret'])) $options['gapp_psecret'] = null;
     if (!isset($options['gapp_gid'])) $options['gapp_gid'] = null;
     if (!isset($options['gapp_gmail'])) $options['gapp_gmail'] = null;
@@ -102,7 +110,7 @@ function gapp_conf() {
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, 'code='.urlencode($_GET['code']).'&client_id='.$options['gapp_pnumber'].'.apps.googleusercontent.com&client_secret='.$options['gapp_psecret'].'&redirect_uri='.admin_url('options-general.php?page=' . GAPP_SLUG).'&grant_type=authorization_code');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, 'code='.urlencode($_GET['code']).'&client_id='.$options['gapp_clientid'].'&client_secret='.$options['gapp_psecret'].'&redirect_uri='.admin_url('options-general.php?page=' . GAPP_SLUG).'&grant_type=authorization_code');
 
         $result = curl_exec($ch);
 
@@ -152,7 +160,7 @@ function gapp_conf() {
 
     } elseif ($_GET['state'] == 'clear') {
 
-        $options['gapp_pnumber'] = null;
+	    $options['gapp_clientid'] = null;
         $options['gapp_psecret'] = null;
 
         update_option('gapp', $options);
@@ -165,8 +173,8 @@ function gapp_conf() {
 
 		check_admin_referer('gapp', 'gapp-admin');
 
-		if (isset($_POST['gapp_pnumber'])) {
-            $options['gapp_pnumber'] = $_POST['gapp_pnumber'];
+		if (isset($_POST['gapp_clientid'])) {
+            $options['gapp_clientid'] = $_POST['gapp_clientid'];
 		}
 
         if (isset($_POST['gapp_psecret'])) {
@@ -209,18 +217,18 @@ function gapp_conf() {
 
     if (empty($options['gapp_token'])) {
 
-        if (empty($options['gapp_pnumber']) || empty($options['gapp_psecret'])) {
+        if (empty($options['gapp_clientid']) || empty($options['gapp_psecret'])) {
 
             echo '<p>'.__('In order to connect to your Google Analytics Account, you need to create a new project in the <a href="https://console.developers.google.com/project" target="_blank">Google API Console</a> and activate the Analytics API in "APIs &amp; auth &gt; APIs".', GAPP_TEXTDOMAIN).'</p>';
 
             echo '<form action="'.admin_url('options-general.php?page=' . GAPP_SLUG).'" method="post" id="gapp-conf">';
 
-            echo '<h3><label for="gapp_pnumber">'.__('Project Number:', GAPP_TEXTDOMAIN).'</label></h3>';
-            echo '<p><input type="text" id="gapp_pnumber" name="gapp_pnumber" value="'.$options['gapp_pnumber'].'" style="width: 400px;" /></p>';
-
             echo '<p>'.__('Then, create an OAuth Client ID in "APIs &amp; auth &gt; Credentials". Enter this URL for the Redirect URI field:', GAPP_TEXTDOMAIN).'<br/>';
             echo admin_url('options-general.php?page=' . GAPP_SLUG);
             echo '</p>';
+
+            echo '<h3><label for="gapp_clientid">'.__('Client ID:', GAPP_TEXTDOMAIN).'</label></h3>';
+            echo '<p><input type="text" id="gapp_clientid" name="gapp_clientid" value="'.$options['gapp_clientid'].'" style="width: 400px;" /></p>';
 
             echo '<h3><label for="gapp_psecret">'.__('Client secret:', GAPP_TEXTDOMAIN).'</label></h3>';
             echo '<p><input type="text" id="gapp_psecret" name="gapp_psecret" value="'.$options['gapp_psecret'].'" style="width: 400px;" /></p>';
@@ -231,7 +239,7 @@ function gapp_conf() {
 
         } else {
 
-            $url_auth = 'https://accounts.google.com/o/oauth2/auth?client_id='.$options['gapp_pnumber'].'.apps.googleusercontent.com&redirect_uri=';
+            $url_auth = 'https://accounts.google.com/o/oauth2/auth?client_id='.$options['gapp_clientid'].'&redirect_uri=';
             $url_auth .= admin_url('options-general.php?page=' . GAPP_SLUG);
             $url_auth .= '&scope=https://www.googleapis.com/auth/analytics.readonly+https://www.googleapis.com/auth/userinfo.email+https://www.googleapis.com/auth/userinfo.profile&response_type=code&access_type=offline&state=init&approval_prompt=force';
 
