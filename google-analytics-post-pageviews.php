@@ -5,9 +5,10 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.0.1
+Version: 1.1
 */
 
+define('GAPP_SLUG', 'google-analytics-post-pageviews');
 define('GAPP_TEXTDOMAIN', 'google-analytics-post-pageviews');
 
 if (function_exists('load_plugin_textdomain')) {
@@ -23,7 +24,7 @@ function gapp_config_page() {
         add_submenu_page('options-general.php',
             __('Post Pageviews', GAPP_TEXTDOMAIN),
             __('Post Pageviews', GAPP_TEXTDOMAIN),
-            'manage_options', __FILE__, 'gapp_conf');
+            'manage_options', GAPP_SLUG, 'gapp_conf');
 
     }
 
@@ -101,7 +102,7 @@ function gapp_conf() {
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, 'code='.urlencode($_GET['code']).'&client_id='.$options['gapp_pnumber'].'.apps.googleusercontent.com&client_secret='.$options['gapp_psecret'].'&redirect_uri='.admin_url('options-general.php?page=google-analytics-post-pageviews/google-analytics-post-pageviews.php').'&grant_type=authorization_code');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, 'code='.urlencode($_GET['code']).'&client_id='.$options['gapp_pnumber'].'.apps.googleusercontent.com&client_secret='.$options['gapp_psecret'].'&redirect_uri='.admin_url('options-general.php?page=' . GAPP_SLUG).'&grant_type=authorization_code');
 
         $result = curl_exec($ch);
 
@@ -210,15 +211,15 @@ function gapp_conf() {
 
         if (empty($options['gapp_pnumber']) || empty($options['gapp_psecret'])) {
 
-            echo '<p>'.__('In order to connect to your Google Analytics Account, you need to create a new project in the <a href="https://code.google.com/apis/console/" target="_blank">Google API Console</a>.', GAPP_TEXTDOMAIN).'</p>';
+            echo '<p>'.__('In order to connect to your Google Analytics Account, you need to create a new project in the <a href="https://console.developers.google.com/project" target="_blank">Google API Console</a> and activate the Analytics API in "APIs &amp; auth &gt; APIs".', GAPP_TEXTDOMAIN).'</p>';
 
-            echo '<form action="'.admin_url('options-general.php?page=google-analytics-post-pageviews/google-analytics-post-pageviews.php').'" method="post" id="gapp-conf">';
+            echo '<form action="'.admin_url('options-general.php?page=' . GAPP_SLUG).'" method="post" id="gapp-conf">';
 
             echo '<h3><label for="gapp_pnumber">'.__('Project Number:', GAPP_TEXTDOMAIN).'</label></h3>';
             echo '<p><input type="text" id="gapp_pnumber" name="gapp_pnumber" value="'.$options['gapp_pnumber'].'" style="width: 400px;" /></p>';
 
-            echo '<p>'.__('Then, create an OAuth Client ID in "API Access". Enter this URL for the Redirect URI field:', GAPP_TEXTDOMAIN).'<br/>';
-            echo admin_url('options-general.php?page=google-analytics-post-pageviews/google-analytics-post-pageviews.php');
+            echo '<p>'.__('Then, create an OAuth Client ID in "APIs &amp; auth &gt; Credentials". Enter this URL for the Redirect URI field:', GAPP_TEXTDOMAIN).'<br/>';
+            echo admin_url('options-general.php?page=' . GAPP_SLUG);
             echo '</p>';
 
             echo '<h3><label for="gapp_psecret">'.__('Client secret:', GAPP_TEXTDOMAIN).'</label></h3>';
@@ -231,12 +232,12 @@ function gapp_conf() {
         } else {
 
             $url_auth = 'https://accounts.google.com/o/oauth2/auth?client_id='.$options['gapp_pnumber'].'.apps.googleusercontent.com&redirect_uri=';
-            $url_auth .= admin_url('options-general.php?page=google-analytics-post-pageviews/google-analytics-post-pageviews.php');
+            $url_auth .= admin_url('options-general.php?page=' . GAPP_SLUG);
             $url_auth .= '&scope=https://www.googleapis.com/auth/analytics.readonly+https://www.googleapis.com/auth/userinfo.email+https://www.googleapis.com/auth/userinfo.profile&response_type=code&access_type=offline&state=init&approval_prompt=force';
 
             echo '<p><a href="'.$url_auth.'">'.__('Connect to Google Analytics', GAPP_TEXTDOMAIN).'</a></p>';
 
-            echo '<p><a href="'.admin_url('options-general.php?page=google-analytics-post-pageviews/google-analytics-post-pageviews.php').'&state=clear">'.__('Clear the API keys').' &raquo;</a></p>';
+            echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG).'&state=clear">'.__('Clear the API keys').' &raquo;</a></p>';
 
         }
 
@@ -246,9 +247,9 @@ function gapp_conf() {
 
         echo '<p>'.__('Your token expires on:', GAPP_TEXTDOMAIN).' '.date('m/d/Y H:i:s', $options['gapp_expires']).'.</p>';
 
-        echo '<p><a href="'.admin_url('options-general.php?page=google-analytics-post-pageviews/google-analytics-post-pageviews.php').'&state=reset">'.__('Disconnect from Google Analytics').' &raquo;</a></p>';
+        echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG).'&state=reset">'.__('Disconnect from Google Analytics').' &raquo;</a></p>';
 
-        echo '<form action="'.admin_url('options-general.php?page=google-analytics-post-pageviews/google-analytics-post-pageviews.php').'" method="post" id="gapp-conf">';
+        echo '<form action="'.admin_url('options-general.php?page=' . GAPP_SLUG).'" method="post" id="gapp-conf">';
 
         echo '<h3><label for="gapp_wid">'.__('Use this website to retrieve pageviews numbers:', GAPP_TEXTDOMAIN).'</label></h3>';
         echo '<p><select id="gapp_wid" name="gapp_wid" style="width: 400px;" />';
