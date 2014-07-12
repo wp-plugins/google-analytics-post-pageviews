@@ -5,7 +5,7 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.1
+Version: 1.2
 */
 
 define('GAPP_SLUG', 'google-analytics-post-pageviews');
@@ -40,20 +40,23 @@ function gapp_api_call($url, $params = array()) {
 
     if ($now > $options['gapp_expires'] && !empty($options['gapp_token_refresh'])) {
 
-        $ch = curl_init();
+	    $request = new WP_Http;
 
-        curl_setopt($ch, CURLOPT_URL, 'https://accounts.google.com/o/oauth2/token');
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, 'client_id='.$options['gapp_clientid'].'&client_secret='.$options['gapp_psecret'].'&refresh_token='.urlencode($options['gapp_token_refresh']).'&grant_type=refresh_token');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+	    $result = $request->request('https://accounts.google.com/o/oauth2/token', array(
+		    'method' => 'POST',
+		    'body' => array(
+			    'client_id' => $options['gapp_clientid'],
+			    'client_secret' => $options['gapp_psecret'],
+			    'refresh_token' => $options['gapp_token_refresh'],
+			    'grant_type' => 'refresh_token',
+		    ),
+		));
 
-        $data = curl_exec($ch);
-        curl_close($ch);
+        $tjson = json_decode($result['body']);
 
-        $tjson = json_decode($data);
-
-        $data = file_get_contents('https://www.googleapis.com/oauth2/v1/userinfo?access_token='.urlencode($options['gapp_token']));
-        $ijson = json_decode($data);
+	    $request = new WP_Http;
+	    $result = $request->request('https://www.googleapis.com/oauth2/v1/userinfo?access_token='.urlencode($options['gapp_token']));
+        $ijson = json_decode($result['body']);
 
         $options['gapp_token'] = $tjson->access_token;
         $options['gapp_token_refresh'] = $tjson->refresh_token;
@@ -70,8 +73,9 @@ function gapp_api_call($url, $params = array()) {
 
     }
 
-    $data = file_get_contents($url.$qs);
-    $json = json_decode($data);
+	$request = new WP_Http;
+	$result = $request->request($url.$qs);
+    $json = json_decode($result['body']);
 
     return $json;
 
@@ -104,28 +108,30 @@ function gapp_conf() {
 
     if ($_GET['state'] == 'init' && $_GET['code']) {
 
-        $ch = curl_init();
+	    $request = new WP_Http;
 
-        curl_setopt($ch, CURLOPT_URL, 'https://accounts.google.com/o/oauth2/token');
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, 'code='.urlencode($_GET['code']).'&client_id='.$options['gapp_clientid'].'&client_secret='.$options['gapp_psecret'].'&redirect_uri='.admin_url('options-general.php?page=' . GAPP_SLUG).'&grant_type=authorization_code');
+	    $result = $request->request('https://accounts.google.com/o/oauth2/token', array(
+		    'method' => 'POST',
+		    'body' => array(
+			    'code' => $_GET['code'],
+			    'client_id' => $options['gapp_clientid'],
+			    'client_secret' => $options['gapp_psecret'],
+			    'redirect_uri' => admin_url('options-general.php?page=' . GAPP_SLUG),
+			    'grant_type' => 'authorization_code',
+		    )
+	    ));
 
-        $result = curl_exec($ch);
-
-        if ($result === false) {
+	    if ( !is_array( $result ) || !isset( $result['response']['code'] ) && 200 !== $result['response']['code'] ) {
 
             echo '<div id="message" class="error"><p>';
-            _e('There was something wrong with Google:', GAPP_TEXTDOMAIN);
-            echo ' '.curl_error($ch);
+            _e('There was something wrong with Google.', GAPP_TEXTDOMAIN);
             echo "</p></div>";
+
+		    var_dump($result);
 
         }
 
-        curl_close($ch);
-
-        $tjson = json_decode($result);
+        $tjson = json_decode($result['body']);
 
         $options['gapp_token'] = $tjson->access_token;
         $options['gapp_token_refresh'] = $tjson->refresh_token;
