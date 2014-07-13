@@ -5,7 +5,7 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.2
+Version: 1.2.1
 */
 
 define('GAPP_SLUG', 'google-analytics-post-pageviews');
@@ -380,5 +380,40 @@ function gapp_get_post_pageviews($ID = null) {
         }
 
     }
+
+}
+
+// Add a column in Posts list (Optional)
+
+add_filter('manage_posts_columns', 'gapp_column_views');
+add_action('manage_posts_custom_column', 'gapp_custom_column_views', 6, 2);
+
+function gapp_column_views($defaults) {
+
+	$options = get_option('gapp');
+
+	if (!empty($options['gapp_token'])) {
+
+		$defaults['post_views'] = __('Views');
+
+	}
+
+	return $defaults;
+
+}
+
+function gapp_custom_column_views($column_name, $id) {
+
+	$options = get_option('gapp');
+
+	if ($column_name === 'post_views' && !empty($options['gapp_token'])) {
+
+		echo gapp_get_post_pageviews(get_the_ID());
+
+	} else {
+
+		echo 0;
+
+	}
 
 }
