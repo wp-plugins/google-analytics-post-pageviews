@@ -1,0 +1,42 @@
+=== Google Analytics Post Pageviews ===
+Contributors: maximevalette
+Donate link: http://maxime.sh/paypal
+Tags: google, analytics, ga, post, pageviews, counter, visits
+Requires at least: 3.0
+Tested up to: 3.9
+Stable tag: 1.2.2
+
+Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
+
+== Description ==
+
+This WordPress plugin links to your Google Analytics account to retrieve the pageviews for your posts.
+
+Therefore you can easily include this number in your blog for yourself or all of your visitors.
+
+== Installation ==
+
+1. Copy the google-analytics-post-pageviews folder into wp-content/plugins
+2. Activate the plugin through the Plugins menu
+3. Configure from the new Post Pageviews Settings submenu
+
+== Changelog ==
+
+= 1.2.2 =
+* Minor but essential fix in the code snippet.
+
+= 1.2.1 =
+* Added an optional Views column in Posts list.
+
+= 1.2 =
+* Updated curl_ and file_ methods to WP_Http requests.
+
+= 1.1 =
+* Changed the Google URLs to match the new Google Developers Console.
+* Specified a unique slug to prevent redirect_uri_mismatch.
+
+= 1.0.1 =
+* Fixed a bug that prevented the token refresh.
+
+= 1.0 =
+* First version. Enjoy!
