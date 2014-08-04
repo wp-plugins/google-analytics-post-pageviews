@@ -5,7 +5,7 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.2.2
+Version: 1.2.3
 */
 
 define('GAPP_SLUG', 'google-analytics-post-pageviews');
@@ -75,9 +75,15 @@ function gapp_api_call($url, $params = array()) {
 
 	$request = new WP_Http;
 	$result = $request->request($url.$qs);
-    $json = json_decode($result['body']);
+	$json = new stdClass();
 
-    return $json;
+	if ( is_array( $result ) && isset( $result['response']['code'] ) && 200 === $result['response']['code'] ) {
+
+		$json = json_decode($result['body']);
+
+	}
+
+	return $json;
 
 }
 
@@ -190,6 +196,14 @@ function gapp_conf() {
         if (isset($_POST['gapp_wid'])) {
             $options['gapp_wid'] = $_POST['gapp_wid'];
         }
+
+		if (isset($_POST['gapp_cache'])) {
+			$options['gapp_cache'] = $_POST['gapp_cache'];
+		}
+
+		if (isset($_POST['gapp_startdate'])) {
+			$options['gapp_startdate'] = $_POST['gapp_startdate'];
+		}
 
 		update_option('gapp', $options);
 
@@ -314,7 +328,7 @@ function gapp_conf() {
         echo '</select></p>';
 
         echo '<h3><label for="gapp_startdate">'.__('Start date for the analytics:', GAPP_TEXTDOMAIN).'</label></h3>';
-        echo '<p><input type="text" id="gapp_psecret" name="gapp_startdate" value="'.$options['gapp_startdate'].'" /></p>';
+        echo '<p><input type="text" id="gapp_startdate" name="gapp_startdate" value="'.$options['gapp_startdate'].'" /></p>';
 
         echo '<p class="submit" style="text-align: left">';
         wp_nonce_field('gapp', 'gapp-admin');
@@ -361,7 +375,15 @@ function gapp_get_post_pageviews($ID = null) {
                 'max-results' => 1000)
         );
 
-        $totalResult = $json->totalsForAllResults->{'ga:pageviews'};
+	    if ( isset( $json->totalsForAllResults->{'ga:pageviews'} ) ) {
+
+		    $totalResult = $json->totalsForAllResults->{'ga:pageviews'};
+
+	    } else {
+
+		    $totalResult = 0;
+
+	    }
 
         if (is_numeric($totalResult) && $totalResult > 0) {
 
