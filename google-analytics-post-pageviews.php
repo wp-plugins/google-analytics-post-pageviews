@@ -5,7 +5,7 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.2.3
+Version: 1.2.4
 */
 
 define('GAPP_SLUG', 'google-analytics-post-pageviews');
@@ -342,17 +342,23 @@ function gapp_get_post_pageviews($ID = null) {
 
     $options = get_option('gapp');
 
-    if ($ID) {
+	if (empty($options['gapp_token'])) {
 
-        $gaTransName = 'ga-transient-'.$ID;
-        $permalink = get_permalink($ID);
+		return 0;
 
-    } else {
+	}
 
-        $gaTransName = 'ga-transient-'.get_the_ID();
-        $permalink = get_permalink();
+	if ($ID) {
 
-    }
+		$gaTransName = 'gapp-transient-'.$ID;
+		$permalink = '/' . basename(get_permalink($ID));
+
+	} else {
+
+		$gaTransName = 'gapp-transient-'.get_the_ID();
+		$permalink = '/' . basename(get_permalink());
+
+	}
 
     $totalResult = get_transient($gaTransName);
 
@@ -364,14 +370,12 @@ function gapp_get_post_pageviews($ID = null) {
 
     } else {
 
-        $pageURL = parse_url($permalink);
-
         $json = gapp_api_call('https://www.googleapis.com/analytics/v3/data/ga',
             array('ids' => 'ga:'.$options['gapp_wid'],
                 'start-date' => $options['gapp_startdate'],
                 'end-date' => date('Y-m-d'),
                 'metrics' => 'ga:pageviews',
-                'filters' => 'ga:pagePath=@'.$pageURL['path'],
+                'filters' => 'ga:pagePath=@' . $permalink,
                 'max-results' => 1000)
         );
 
@@ -426,15 +430,9 @@ function gapp_column_views($defaults) {
 
 function gapp_custom_column_views($column_name, $id) {
 
-	$options = get_option('gapp');
-
-	if ($column_name === 'post_views' && !empty($options['gapp_token'])) {
+	if ($column_name === 'post_views') {
 
 		echo gapp_get_post_pageviews(get_the_ID());
-
-	} else {
-
-		echo 0;
 
 	}
 
