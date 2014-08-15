@@ -411,7 +411,7 @@ function gapp_get_post_pageviews($ID = null) {
 
             set_transient($gaTransName, $totalResult, 60 * 60 * $options['gapp_cache']);
 
-            $totalResult = number_format($totalResult, 0, ',', ' ');
+            $totalResult = number_format($totalResult);
 
             return $totalResult;
 
