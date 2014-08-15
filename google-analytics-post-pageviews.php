@@ -364,9 +364,7 @@ function gapp_get_post_pageviews($ID = null, $format = true) {
 
     if ($totalResult !== false) {
 
-        $totalResult = number_format($totalResult, 0, ',', ' ');
-
-        return $totalResult;
+	    return ($format) ? number_format_i18n($totalResult) : $totalResult;
 
     } else {
 
