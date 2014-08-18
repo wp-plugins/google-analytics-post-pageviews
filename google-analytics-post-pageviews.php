@@ -5,7 +5,7 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.2.6
+Version: 1.2.7
 */
 
 define('GAPP_SLUG', 'google-analytics-post-pageviews');
@@ -30,13 +30,21 @@ function gapp_config_page() {
 
 }
 
-function gapp_api_call($url, $params = array()) {
+function gapp_api_call($url, $params = array(), $force = false) {
 
     $options = get_option('gapp');
 
     $now = time();
 
-    /* Si le token est expiré, on le refait */
+	/* If we had a previous error, don't force the API call to avoid flooding */
+
+	if (!$force && isset($options['gapp_dontcall']) && $options['gapp_dontcall'] > time()) {
+
+		return new stdClass();
+
+	}
+
+    /* If the token has expired, we create it again */
 
     if ($now > $options['gapp_expires'] && !empty($options['gapp_token_refresh'])) {
 
@@ -52,16 +60,43 @@ function gapp_api_call($url, $params = array()) {
 		    ),
 		));
 
-        $tjson = json_decode($result['body']);
+	    if ( is_array( $result ) && isset( $result['response']['code'] ) && 200 === $result['response']['code'] ) {
 
-	    $request = new WP_Http;
-	    $result = $request->request('https://www.googleapis.com/oauth2/v1/userinfo?access_token='.urlencode($options['gapp_token']));
-        $ijson = json_decode($result['body']);
+		    $tjson = json_decode($result['body']);
 
-        $options['gapp_token'] = $tjson->access_token;
-        $options['gapp_token_refresh'] = $tjson->refresh_token;
-        $options['gapp_expires'] = time() + $tjson->expires_in;
-        $options['gapp_gid'] = $ijson->id;
+		    $request = new WP_Http;
+		    $result = $request->request('https://www.googleapis.com/oauth2/v1/userinfo?access_token='.urlencode($options['gapp_token']));
+
+		    if ( is_array( $result ) && isset( $result['response']['code'] ) && 200 === $result['response']['code'] ) {
+
+			    $ijson = json_decode($result['body']);
+
+			    $options['gapp_token'] = $tjson->access_token;
+			    $options['gapp_token_refresh'] = $tjson->refresh_token;
+			    $options['gapp_expires'] = time() + $tjson->expires_in;
+			    $options['gapp_gid'] = $ijson->id;
+
+			    update_option('gapp', $options);
+
+		    } else {
+
+			    $options['gapp_dontcall'] = time() + 1800;
+
+			    update_option('gapp', $options);
+
+			    return new stdClass();
+
+		    }
+
+	    } else {
+
+		    $options['gapp_dontcall'] = time() + 1800;
+
+		    update_option('gapp', $options);
+
+		    return new stdClass();
+
+	    }
 
     }
 
@@ -89,6 +124,9 @@ function gapp_api_call($url, $params = array()) {
 
 function gapp_conf() {
 
+	/** @var $wpdb WPDB */
+	global $wpdb;
+
 	$options = get_option('gapp');
 
 	if (!isset($options['gapp_clientid'])) {
@@ -112,7 +150,7 @@ function gapp_conf() {
 
 	$updated = false;
 
-    if ($_GET['state'] == 'init' && $_GET['code']) {
+    if (isset($_GET['state']) && $_GET['state'] == 'init' && $_GET['code']) {
 
 	    $request = new WP_Http;
 
@@ -145,7 +183,7 @@ function gapp_conf() {
 
         update_option('gapp', $options);
 
-        $ijson = gapp_api_call('https://www.googleapis.com/oauth2/v1/userinfo');
+        $ijson = gapp_api_call('https://www.googleapis.com/oauth2/v1/userinfo', array(), true);
 
         $options['gapp_gid'] = $ijson->id;
         $options['gapp_gmail'] = $ijson->email;
@@ -158,7 +196,7 @@ function gapp_conf() {
 
         }
 
-    } elseif ($_GET['state'] == 'reset') {
+    } elseif (isset($_GET['state']) && $_GET['state'] == 'reset') {
 
         $options['gapp_gid'] = null;
         $options['gapp_gmail'] = null;
@@ -170,7 +208,7 @@ function gapp_conf() {
 
         $updated = true;
 
-    } elseif ($_GET['state'] == 'clear') {
+    } elseif (isset($_GET['state']) && $_GET['state'] == 'clear') {
 
 	    $options['gapp_clientid'] = null;
         $options['gapp_psecret'] = null;
@@ -178,6 +216,20 @@ function gapp_conf() {
         update_option('gapp', $options);
 
         $updated = true;
+
+    } elseif (isset($_GET['dontcall'])) {
+
+	    $options['gapp_dontcall'] = 0;
+
+	    update_option('gapp', $options);
+
+	    $updated = true;
+
+    } elseif (isset($_GET['reset'])) {
+
+	    $wpdb->query("DELETE FROM `wp_options` WHERE `option_name` LIKE '_transient_gapp-transient-%'");
+
+	    $updated = true;
 
     }
 
@@ -275,7 +327,9 @@ function gapp_conf() {
 
         echo '<p>'.__('Your token expires on:', GAPP_TEXTDOMAIN).' '.date('m/d/Y H:i:s', $options['gapp_expires']).'.</p>';
 
-        echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG).'&state=reset">'.__('Disconnect from Google Analytics').' &raquo;</a></p>';
+        echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG).'&state=reset">'.__('Disconnect from Google Analytics', GAPP_TEXTDOMAIN).' &raquo;</a></p>';
+
+	    echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG . '&reset').'">'.__('Empty pageviews cache', GAPP_TEXTDOMAIN).' &raquo;</a></p>';
 
         echo '<form action="'.admin_url('options-general.php?page=' . GAPP_SLUG).'" method="post" id="gapp-conf">';
 
@@ -286,7 +340,7 @@ function gapp_conf() {
         if (empty($options['gapp_wid'])) echo ' SELECTED';
         echo '>'.__('None', GAPP_TEXTDOMAIN).'</option>';
 
-        $wjson = gapp_api_call('https://www.googleapis.com/analytics/v3/management/accounts/~all/webproperties/~all/profiles');
+        $wjson = gapp_api_call('https://www.googleapis.com/analytics/v3/management/accounts/~all/webproperties/~all/profiles', array(), true);
 
         foreach ($wjson->items as $item) {
 
@@ -451,3 +505,22 @@ function gapp_custom_column_views($column_name, $id) {
 	}
 
 }
+
+function gapp_admin_notice() {
+
+	$options = get_option('gapp');
+
+	if (current_user_can('manage_options')) {
+
+		if (isset($options['gapp_dontcall']) && $options['gapp_dontcall'] > time() && !isset($_GET['dontcall'])) {
+
+			echo '<div class="error"><p>'.__('Google Post Pageviews Warning: Your last API request to Google resulted in an error. The requests have been disabled until ', GAPP_TEXTDOMAIN).' ' . date_i18n( 'Y/m/d \a\t g:ia', $options['gapp_dontcall'] + ( get_option( 'gmt_offset' ) * 3600 ), 1 ) . '.<br><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG . '&dontcall').'">'.__('Remove limitation', GAPP_TEXTDOMAIN).'</a> | <a href="'.admin_url('options-general.php?page=' . GAPP_SLUG).'">'.__('Update settings', GAPP_TEXTDOMAIN).' &rarr;</a></p></div>';
+
+		}
+
+	}
+
+}
+
+// Admin notice
+add_action('admin_notices', 'gapp_admin_notice');

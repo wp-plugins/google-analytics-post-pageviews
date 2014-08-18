@@ -4,7 +4,7 @@ Donate link: http://maxime.sh/paypal
 Tags: google, analytics, ga, post, pageviews, counter, visits
 Requires at least: 3.0
 Tested up to: 4.0
-Stable tag: 1.2.6
+Stable tag: 1.2.7
 
 Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 
@@ -21,6 +21,11 @@ Therefore you can easily include this number in your blog for yourself or all of
 3. Configure from the new Post Pageviews Settings submenu
 
 == Changelog ==
+
+= 1.2.7 =
+* Improved the way the Google token is refreshed.
+* Added an anti-flood system when the Google API requests are not successful.
+* Added a link to empty the pageviews cache.
 
 = 1.2.6 =
 * Using international number formatting for the views count, and adding a parameter to disable it on function call.
