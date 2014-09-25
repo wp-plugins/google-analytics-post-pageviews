@@ -5,7 +5,7 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.2.9
+Version: 1.3.1
 */
 
 define('GAPP_SLUG', 'google-analytics-post-pageviews');
@@ -33,6 +33,12 @@ function gapp_config_page() {
 function gapp_api_call($url, $params = array()) {
 
     $options = get_option('gapp');
+
+	if (time() >= $options['gapp_expires']) {
+
+		$options = gapp_refresh_token();
+
+	}
 
     $qs = '?access_token='.urlencode($options['gapp_token']);
 
@@ -92,7 +98,7 @@ function gapp_refresh_token() {
 			$tjson = json_decode($result['body']);
 
 			$request = new WP_Http;
-			$result = $request->request('https://www.googleapis.com/oauth2/v1/userinfo?access_token='.urlencode($options['gapp_token']));
+			$result = $request->request('https://www.googleapis.com/oauth2/v1/userinfo?access_token='.urlencode($tjson->access_token));
 
 			if ( is_array( $result ) && isset( $result['response']['code'] ) && 200 === $result['response']['code'] ) {
 
@@ -106,20 +112,6 @@ function gapp_refresh_token() {
 
 				$options['gapp_expires'] = time() + $tjson->expires_in;
 				$options['gapp_gid'] = $ijson->id;
-
-				$cron = _get_cron_array();
-
-				foreach ( $cron as $timestamp => $cronhooks ) {
-					foreach ( (array) $cronhooks as $hook => $events ) {
-						foreach ( (array) $events as $key => $event ) {
-							if ($hook == 'gapp_refresh_token') {
-								wp_unschedule_event( $timestamp, 'gapp_refresh_token', $event['args'] );
-							}
-						}
-					}
-				}
-
-				wp_schedule_single_event( time() + $tjson->expires_in - 600, 'gapp_refresh_token', array( ) );
 
 				update_option('gapp', $options);
 
@@ -146,6 +138,8 @@ function gapp_refresh_token() {
 		}
 
 	}
+
+	return $options;
 
 }
 
@@ -558,6 +552,3 @@ function gapp_admin_notice() {
 
 // Admin notice
 add_action('admin_notices', 'gapp_admin_notice');
-
-// Add event
-add_action('gapp_refresh_token', 'gapp_refresh_token', 10, 2);
