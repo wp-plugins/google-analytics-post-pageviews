@@ -321,6 +321,8 @@ function gapp_conf() {
             echo admin_url('options-general.php?page=' . GAPP_SLUG);
             echo '</p>';
 
+	        echo '<p>'.__('You also have to fill the Product Name field in "APIs & auth" -> "Consent screen" — you need to select e-mail address as well.').'</p>';
+
             echo '<h3><label for="gapp_clientid">'.__('Client ID:', GAPP_TEXTDOMAIN).'</label></h3>';
             echo '<p><input type="text" id="gapp_clientid" name="gapp_clientid" value="'.$options['gapp_clientid'].'" style="width: 400px;" /></p>';
 
