@@ -5,7 +5,7 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.3.1
+Version: 1.3.2
 */
 
 define('GAPP_SLUG', 'google-analytics-post-pageviews');
@@ -52,13 +52,25 @@ function gapp_api_call($url, $params = array()) {
 	$result = $request->request($url.$qs);
 	$json = new stdClass();
 
+    $options['gapp_error'] = null;
+
 	if ( is_array( $result ) && isset( $result['response']['code'] ) && 200 === $result['response']['code'] ) {
 
-		$json = json_decode($result['body']);
+        $json = json_decode($result['body']);
+
+        update_option('gapp', $options);
 
 		return $json;
 
 	} else {
+
+        if ( is_array( $result ) && isset( $result['response']['code'] ) && 403 === $result['response']['code'] ) {
+
+            $json = json_decode($result['body'], true);
+
+            $options['gapp_error'] = $json['error']['errors'][0]['message'];
+
+        }
 
 		$options['gapp_token'] = null;
 		$options['gapp_token_refresh'] = null;
@@ -93,6 +105,8 @@ function gapp_refresh_token() {
 			),
 		));
 
+        $options['gapp_error'] = null;
+
 		if ( is_array( $result ) && isset( $result['response']['code'] ) && 200 === $result['response']['code'] ) {
 
 			$tjson = json_decode($result['body']);
@@ -116,6 +130,14 @@ function gapp_refresh_token() {
 				update_option('gapp', $options);
 
 			} else {
+
+                if ( is_array( $result ) && isset( $result['response']['code'] ) && 403 === $result['response']['code'] ) {
+
+                    $json = json_decode($result['body'], true);
+
+                    $options['gapp_error'] = $json['error']['errors'][0]['message'];
+
+                }
 
 				$options['gapp_token'] = null;
 				$options['gapp_token_refresh'] = null;
@@ -546,7 +568,11 @@ function gapp_admin_notice() {
 
 			echo '<div class="error"><p>'.__('Google Post Pageviews Warning: You have to (re)connect the plugin to your Google account.') . '<br><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG).'">'.__('Update settings', GAPP_TEXTDOMAIN).' &rarr;</a></p></div>';
 
-		}
+		} elseif (isset($options['gapp_error']) && !empty($options['gapp_error'])) {
+
+            echo '<div class="error"><p>'.__('Google Post Pageviews Error: ') . $options['gapp_error'] . '<br><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG).'">'.__('Update settings', GAPP_TEXTDOMAIN).' &rarr;</a></p></div>';
+
+        }
 
 	}
 
