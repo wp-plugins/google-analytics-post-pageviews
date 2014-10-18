@@ -5,7 +5,7 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.3.2
+Version: 1.3.3
 */
 
 define('GAPP_SLUG', 'google-analytics-post-pageviews');
@@ -70,14 +70,14 @@ function gapp_api_call($url, $params = array()) {
 
             $options['gapp_error'] = $json['error']['errors'][0]['message'];
 
+            $options['gapp_token'] = null;
+            $options['gapp_token_refresh'] = null;
+            $options['gapp_expires'] = null;
+            $options['gapp_gid'] = null;
+
+            update_option('gapp', $options);
+
         }
-
-		$options['gapp_token'] = null;
-		$options['gapp_token_refresh'] = null;
-		$options['gapp_expires'] = null;
-		$options['gapp_gid'] = null;
-
-		update_option('gapp', $options);
 
 		return new stdClass();
 
@@ -129,24 +129,20 @@ function gapp_refresh_token() {
 
 				update_option('gapp', $options);
 
-			} else {
+			} elseif ( is_array( $result ) && isset( $result['response']['code'] ) && 403 === $result['response']['code'] ) {
 
-                if ( is_array( $result ) && isset( $result['response']['code'] ) && 403 === $result['response']['code'] ) {
+                $json = json_decode($result['body'], true);
 
-                    $json = json_decode($result['body'], true);
+                $options['gapp_error'] = $json['error']['errors'][0]['message'];
 
-                    $options['gapp_error'] = $json['error']['errors'][0]['message'];
+                $options['gapp_token'] = null;
+                $options['gapp_token_refresh'] = null;
+                $options['gapp_expires'] = null;
+                $options['gapp_gid'] = null;
 
-                }
+                update_option('gapp', $options);
 
-				$options['gapp_token'] = null;
-				$options['gapp_token_refresh'] = null;
-				$options['gapp_expires'] = null;
-				$options['gapp_gid'] = null;
-
-				update_option('gapp', $options);
-
-			}
+            }
 
 		} else {
 
