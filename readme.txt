@@ -23,6 +23,7 @@ Therefore you can easily include this number in your blog for yourself or all of
 == Changelog ==
 
 = 1.3.4 =
+* Try to display the cached number even if Google is disconnected.
 * Check the array for websites results in the settings.
 
 = 1.3.3 =

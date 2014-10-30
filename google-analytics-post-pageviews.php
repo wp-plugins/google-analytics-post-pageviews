@@ -448,12 +448,6 @@ function gapp_get_post_pageviews($ID = null, $format = true) {
 
     $options = get_option('gapp');
 
-	if (empty($options['gapp_token'])) {
-
-		return 0;
-
-	}
-
 	if ($ID) {
 
 		$gaTransName = 'gapp-transient-'.$ID;
@@ -473,6 +467,12 @@ function gapp_get_post_pageviews($ID = null, $format = true) {
 	    return ($format) ? number_format_i18n($totalResult) : $totalResult;
 
     } else {
+
+        if (empty($options['gapp_token'])) {
+
+            return 0;
+
+        }
 
 	    if ($ID) {
 
