@@ -5,7 +5,7 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.3.3
+Version: 1.3.4
 */
 
 define('GAPP_SLUG', 'google-analytics-post-pageviews');
@@ -144,7 +144,7 @@ function gapp_refresh_token() {
 
             }
 
-		} else {
+		} /* else {
 
 			$options['gapp_token'] = null;
 			$options['gapp_token_refresh'] = null;
@@ -153,7 +153,7 @@ function gapp_refresh_token() {
 
 			update_option('gapp', $options);
 
-		}
+		} */
 
 	}
 
@@ -386,15 +386,19 @@ function gapp_conf() {
 
         $wjson = gapp_api_call('https://www.googleapis.com/analytics/v3/management/accounts/~all/webproperties/~all/profiles', array());
 		
-        foreach ($wjson->items as $item) {
+        if (is_array($wjson->items)) {
 
-            if ($item->type != 'WEB') {
-            	continue;
+            foreach ($wjson->items as $item) {
+
+                if ($item->type != 'WEB') {
+                    continue;
+                }
+
+                echo '<option value="'.$item->id.'"';
+                if ($options['gapp_wid'] == $item->id) echo ' SELECTED';
+                echo '>'.$item->name.' ('.$item->websiteUrl.')</option>';
+
             }
-
-            echo '<option value="'.$item->id.'"';
-            if ($options['gapp_wid'] == $item->id) echo ' SELECTED';
-            echo '>'.$item->name.' ('.$item->websiteUrl.')</option>';
 
         }
 
