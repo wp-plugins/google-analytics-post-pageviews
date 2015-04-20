@@ -5,7 +5,7 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.3.6
+Version: 1.3.7
 */
 
 define('GAPP_SLUG', 'google-analytics-post-pageviews');
@@ -267,8 +267,10 @@ function gapp_conf() {
 
     } elseif (isset($_GET['reset'])) {
 
-	    $wpdb->query("DELETE FROM `wp_options` WHERE `option_name` LIKE '_transient_gapp-transient-%'");
-	    $wpdb->query("DELETE FROM `wp_options` WHERE `option_name` LIKE '_transient_timeout_gapp-transient-%'");
+	    $wpdb->query("DELETE FROM `" . $wpdb->options . "` WHERE `option_name` LIKE '_transient_gapp-transient-%'");
+	    $wpdb->query("DELETE FROM `" . $wpdb->options . "` WHERE `option_name` LIKE '_transient_timeout_gapp-transient-%'");
+
+        set_transient('gapp-namespace-key', uniqid(), 86400 * 365);
 
 	    $updated = true;
 
@@ -460,6 +462,14 @@ function gapp_get_post_pageviews($ID = null, $format = true) {
 		$permalink = '/' . basename(get_permalink());
 
 	}
+
+    $namespaceKey = get_transient('gapp-namespace-key');
+
+    if ($namespaceKey === false) {
+        set_transient('gapp-namespace-key', uniqid(), 86400 * 365);
+    }
+
+    $gaTransName .= '-' . $namespaceKey;
 
     $totalResult = get_transient($gaTransName);
 
