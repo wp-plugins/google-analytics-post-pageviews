@@ -5,14 +5,13 @@ Plugin URI: http://maxime.sh/google-analytics-post-pageviews
 Description: Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
 Author: Maxime VALETTE
 Author URI: http://maxime.sh
-Version: 1.2.9
+Version: 1.3.8
 */
 
 define('GAPP_SLUG', 'google-analytics-post-pageviews');
-define('GAPP_TEXTDOMAIN', 'google-analytics-post-pageviews');
 
 if (function_exists('load_plugin_textdomain')) {
-	load_plugin_textdomain(GAPP_TEXTDOMAIN, false, dirname(plugin_basename(__FILE__)).'/languages' );
+	load_plugin_textdomain('google-analytics-post-pageviews', false, dirname(plugin_basename(__FILE__)).'/languages' );
 }
 
 add_action('admin_menu', 'gapp_config_page');
@@ -22,8 +21,8 @@ function gapp_config_page() {
 	if (function_exists('add_submenu_page')) {
 
         add_submenu_page('options-general.php',
-            __('Post Pageviews', GAPP_TEXTDOMAIN),
-            __('Post Pageviews', GAPP_TEXTDOMAIN),
+            __('Post Pageviews', 'google-analytics-post-pageviews'),
+            __('Post Pageviews', 'google-analytics-post-pageviews'),
             'manage_options', GAPP_SLUG, 'gapp_conf');
 
     }
@@ -33,6 +32,12 @@ function gapp_config_page() {
 function gapp_api_call($url, $params = array()) {
 
     $options = get_option('gapp');
+
+	if (time() >= $options['gapp_expires']) {
+
+		$options = gapp_refresh_token();
+
+	}
 
     $qs = '?access_token='.urlencode($options['gapp_token']);
 
@@ -46,20 +51,32 @@ function gapp_api_call($url, $params = array()) {
 	$result = $request->request($url.$qs);
 	$json = new stdClass();
 
+    $options['gapp_error'] = null;
+
 	if ( is_array( $result ) && isset( $result['response']['code'] ) && 200 === $result['response']['code'] ) {
 
-		$json = json_decode($result['body']);
+        $json = json_decode($result['body']);
+
+        update_option('gapp', $options);
 
 		return $json;
 
 	} else {
 
-		$options['gapp_token'] = null;
-		$options['gapp_token_refresh'] = null;
-		$options['gapp_expires'] = null;
-		$options['gapp_gid'] = null;
+        if ( is_array( $result ) && isset( $result['response']['code'] ) && 403 === $result['response']['code'] ) {
 
-		update_option('gapp', $options);
+            $json = json_decode($result['body'], true);
+
+            $options['gapp_error'] = $json['error']['errors'][0]['message'];
+
+            $options['gapp_token'] = null;
+            $options['gapp_token_refresh'] = null;
+            $options['gapp_expires'] = null;
+            $options['gapp_gid'] = null;
+
+            update_option('gapp', $options);
+
+        }
 
 		return new stdClass();
 
@@ -87,12 +104,14 @@ function gapp_refresh_token() {
 			),
 		));
 
+        $options['gapp_error'] = null;
+
 		if ( is_array( $result ) && isset( $result['response']['code'] ) && 200 === $result['response']['code'] ) {
 
 			$tjson = json_decode($result['body']);
 
 			$request = new WP_Http;
-			$result = $request->request('https://www.googleapis.com/oauth2/v1/userinfo?access_token='.urlencode($options['gapp_token']));
+			$result = $request->request('https://www.googleapis.com/oauth2/v1/userinfo?access_token='.urlencode($tjson->access_token));
 
 			if ( is_array( $result ) && isset( $result['response']['code'] ) && 200 === $result['response']['code'] ) {
 
@@ -107,34 +126,24 @@ function gapp_refresh_token() {
 				$options['gapp_expires'] = time() + $tjson->expires_in;
 				$options['gapp_gid'] = $ijson->id;
 
-				$cron = _get_cron_array();
-
-				foreach ( $cron as $timestamp => $cronhooks ) {
-					foreach ( (array) $cronhooks as $hook => $events ) {
-						foreach ( (array) $events as $key => $event ) {
-							if ($hook == 'gapp_refresh_token') {
-								wp_unschedule_event( $timestamp, 'gapp_refresh_token', $event['args'] );
-							}
-						}
-					}
-				}
-
-				wp_schedule_single_event( time() + $tjson->expires_in - 600, 'gapp_refresh_token', array( ) );
-
 				update_option('gapp', $options);
 
-			} else {
+			} elseif ( is_array( $result ) && isset( $result['response']['code'] ) && 403 === $result['response']['code'] ) {
 
-				$options['gapp_token'] = null;
-				$options['gapp_token_refresh'] = null;
-				$options['gapp_expires'] = null;
-				$options['gapp_gid'] = null;
+                $json = json_decode($result['body'], true);
 
-				update_option('gapp', $options);
+                $options['gapp_error'] = $json['error']['errors'][0]['message'];
 
-			}
+                $options['gapp_token'] = null;
+                $options['gapp_token_refresh'] = null;
+                $options['gapp_expires'] = null;
+                $options['gapp_gid'] = null;
 
-		} else {
+                update_option('gapp', $options);
+
+            }
+
+		} /* else {
 
 			$options['gapp_token'] = null;
 			$options['gapp_token_refresh'] = null;
@@ -143,9 +152,11 @@ function gapp_refresh_token() {
 
 			update_option('gapp', $options);
 
-		}
+		} */
 
 	}
+
+	return $options;
 
 }
 
@@ -195,7 +206,7 @@ function gapp_conf() {
 	    if ( !is_array( $result ) || !isset( $result['response']['code'] ) && 200 !== $result['response']['code'] ) {
 
             echo '<div id="message" class="error"><p>';
-            _e('There was something wrong with Google.', GAPP_TEXTDOMAIN);
+            _e('There was something wrong with Google.', 'google-analytics-post-pageviews');
             echo "</p></div>";
 
 		    var_dump($result);
@@ -255,7 +266,10 @@ function gapp_conf() {
 
     } elseif (isset($_GET['reset'])) {
 
-	    $wpdb->query("DELETE FROM `wp_options` WHERE `option_name` LIKE '_transient_gapp-transient-%'");
+	    $wpdb->query("DELETE FROM `" . $wpdb->options . "` WHERE `option_name` LIKE '_transient_gapp-transient-%'");
+	    $wpdb->query("DELETE FROM `" . $wpdb->options . "` WHERE `option_name` LIKE '_transient_timeout_gapp-transient-%'");
+
+        set_transient('gapp-namespace-key', uniqid(), 86400 * 365);
 
 	    $updated = true;
 
@@ -296,46 +310,48 @@ function gapp_conf() {
     if ($updated) {
 
 	    echo '<div id="message" class="updated fade"><p>';
-	    _e('Configuration updated.', GAPP_TEXTDOMAIN);
+	    _e('Configuration updated.', 'google-analytics-post-pageviews');
 	    echo '</p></div>';
 
     }
 
     if (!empty($options['gapp_token'])) {
 
-        echo '<h2>'.__('Post Pageviews Usage', GAPP_TEXTDOMAIN).'</h2>';
+        echo '<h2>'.__('Post Pageviews Usage', 'google-analytics-post-pageviews').'</h2>';
 
-        echo '<p>'.__('To display the pageviews number of a particular post, insert this PHP code in your template:', GAPP_TEXTDOMAIN).'</p>';
+        echo '<p>'.__('To display the pageviews number of a particular post, insert this PHP code in your template:', 'google-analytics-post-pageviews').'</p>';
 
         echo '<input type="text" class="regular-text code" value="&lt;?php echo gapp_get_post_pageviews(); ?&gt;"/>';
 
-        echo '<p>'.__('This code must be placed in The Loop. If not, you can specify the post ID.', GAPP_TEXTDOMAIN).'</p>';
+        echo '<p>'.__('This code must be placed in The Loop. If not, you can specify the post ID.', 'google-analytics-post-pageviews').'</p>';
 
     }
 
-    echo '<h2>'.__('Post Pageviews Settings', GAPP_TEXTDOMAIN).'</h2>';
+    echo '<h2>'.__('Post Pageviews Settings', 'google-analytics-post-pageviews').'</h2>';
 
     if (empty($options['gapp_token'])) {
 
         if (empty($options['gapp_clientid']) || empty($options['gapp_psecret'])) {
 
-            echo '<p>'.__('In order to connect to your Google Analytics Account, you need to create a new project in the <a href="https://console.developers.google.com/project" target="_blank">Google API Console</a> and activate the Analytics API in "APIs &amp; auth &gt; APIs".', GAPP_TEXTDOMAIN).'</p>';
+            echo '<p>'.__('In order to connect to your Google Analytics Account, you need to create a new project in the <a href="https://console.developers.google.com/project" target="_blank">Google API Console</a> and activate the Analytics API in "APIs &amp; auth &gt; APIs".', 'google-analytics-post-pageviews').'</p>';
 
             echo '<form action="'.admin_url('options-general.php?page=' . GAPP_SLUG).'" method="post" id="gapp-conf">';
 
-            echo '<p>'.__('Then, create an OAuth Client ID in "APIs &amp; auth &gt; Credentials". Enter this URL for the Redirect URI field:', GAPP_TEXTDOMAIN).'<br/>';
+            echo '<p>'.__('Then, create an OAuth Client ID in "APIs &amp; auth &gt; Credentials". Enter this URL for the Redirect URI field:', 'google-analytics-post-pageviews').'<br/>';
             echo admin_url('options-general.php?page=' . GAPP_SLUG);
             echo '</p>';
 
-            echo '<h3><label for="gapp_clientid">'.__('Client ID:', GAPP_TEXTDOMAIN).'</label></h3>';
+	        echo '<p>'.__('You also have to fill the Product Name field in "APIs & auth" -> "Consent screen" — you need to select e-mail address as well.').'</p>';
+
+            echo '<h3><label for="gapp_clientid">'.__('Client ID:', 'google-analytics-post-pageviews').'</label></h3>';
             echo '<p><input type="text" id="gapp_clientid" name="gapp_clientid" value="'.$options['gapp_clientid'].'" style="width: 400px;" /></p>';
 
-            echo '<h3><label for="gapp_psecret">'.__('Client secret:', GAPP_TEXTDOMAIN).'</label></h3>';
+            echo '<h3><label for="gapp_psecret">'.__('Client secret:', 'google-analytics-post-pageviews').'</label></h3>';
             echo '<p><input type="text" id="gapp_psecret" name="gapp_psecret" value="'.$options['gapp_psecret'].'" style="width: 400px;" /></p>';
 
             echo '<p class="submit" style="text-align: left">';
             wp_nonce_field('gapp', 'gapp-admin');
-            echo '<input type="submit" name="submit" value="'.__('Save', GAPP_TEXTDOMAIN).' &raquo;" /></p></form></div>';
+            echo '<input type="submit" name="submit" value="'.__('Save', 'google-analytics-post-pageviews').' &raquo;" /></p></form></div>';
 
         } else {
 
@@ -343,7 +359,7 @@ function gapp_conf() {
             $url_auth .= admin_url('options-general.php?page=' . GAPP_SLUG);
             $url_auth .= '&scope=https://www.googleapis.com/auth/analytics.readonly+https://www.googleapis.com/auth/userinfo.email+https://www.googleapis.com/auth/userinfo.profile&response_type=code&access_type=offline&state=init&approval_prompt=force';
 
-            echo '<p><a href="'.$url_auth.'">'.__('Connect to Google Analytics', GAPP_TEXTDOMAIN).'</a></p>';
+            echo '<p><a href="'.$url_auth.'">'.__('Connect to Google Analytics', 'google-analytics-post-pageviews').'</a></p>';
 
             echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG).'&state=clear">'.__('Clear the API keys').' &raquo;</a></p>';
 
@@ -351,76 +367,80 @@ function gapp_conf() {
 
     } else {
 
-        echo '<p>'.__('You are connected to Google Analytics with the e-mail address:', GAPP_TEXTDOMAIN).' '.$options['gapp_gmail'].'.</p>';
+        echo '<p>'.__('You are connected to Google Analytics with the e-mail address:', 'google-analytics-post-pageviews').' '.$options['gapp_gmail'].'.</p>';
 
-        echo '<p>'.__('Your token expires on:', GAPP_TEXTDOMAIN).' '.date_i18n( 'Y/m/d \a\t g:ia', $options['gapp_expires'] + ( get_option( 'gmt_offset' ) * 3600 ) , 1 ).'.</p>';
+        echo '<p>'.__('Your token expires on:', 'google-analytics-post-pageviews').' '.date_i18n( 'Y/m/d \a\t g:ia', $options['gapp_expires'] + ( get_option( 'gmt_offset' ) * 3600 ) , 1 ).'.</p>';
 
-	    echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG . '&state=reset').'">'.__('Disconnect from Google Analytics', GAPP_TEXTDOMAIN).' &raquo;</a></p>';
+	    echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG . '&state=reset').'">'.__('Disconnect from Google Analytics', 'google-analytics-post-pageviews').' &raquo;</a></p>';
 
-        echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG . '&refresh').'">'.__('Refresh Google API token', GAPP_TEXTDOMAIN).' &raquo;</a></p>';
+        echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG . '&refresh').'">'.__('Refresh Google API token', 'google-analytics-post-pageviews').' &raquo;</a></p>';
 
-	    echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG . '&reset').'">'.__('Empty pageviews cache', GAPP_TEXTDOMAIN).' &raquo;</a></p>';
+	    echo '<p><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG . '&reset').'">'.__('Empty pageviews cache', 'google-analytics-post-pageviews').' &raquo;</a></p>';
 
         echo '<form action="'.admin_url('options-general.php?page=' . GAPP_SLUG).'" method="post" id="gapp-conf">';
 
-        echo '<h3><label for="gapp_wid">'.__('Use this website to retrieve pageviews numbers:', GAPP_TEXTDOMAIN).'</label></h3>';
+        echo '<h3><label for="gapp_wid">'.__('Use this website to retrieve pageviews numbers:', 'google-analytics-post-pageviews').'</label></h3>';
         echo '<p><select id="gapp_wid" name="gapp_wid" style="width: 400px;" />';
 
         echo '<option value=""';
         if (empty($options['gapp_wid'])) echo ' SELECTED';
-        echo '>'.__('None', GAPP_TEXTDOMAIN).'</option>';
+        echo '>'.__('None', 'google-analytics-post-pageviews').'</option>';
 
         $wjson = gapp_api_call('https://www.googleapis.com/analytics/v3/management/accounts/~all/webproperties/~all/profiles', array());
 		
-        foreach ($wjson->items as $item) {
+        if (is_array($wjson->items)) {
 
-            if ($item->type != 'WEB') {
-            	continue;
+            foreach ($wjson->items as $item) {
+
+                if ($item->type != 'WEB') {
+                    continue;
+                }
+
+                echo '<option value="'.$item->id.'"';
+                if ($options['gapp_wid'] == $item->id) echo ' SELECTED';
+                echo '>'.$item->name.' ('.$item->websiteUrl.')</option>';
+
             }
-
-            echo '<option value="'.$item->id.'"';
-            if ($options['gapp_wid'] == $item->id) echo ' SELECTED';
-            echo '>'.$item->name.' ('.$item->websiteUrl.')</option>';
 
         }
 
         echo '</select></p>';
 
-        echo '<h3><label for="gapp_cache">'.__('Cache time:', GAPP_TEXTDOMAIN).'</label></h3>';
+        echo '<h3><label for="gapp_cache">'.__('Cache time:', 'google-analytics-post-pageviews').'</label></h3>';
         echo '<p><select id="gapp_cache" name="gapp_cache">';
 
         echo '<option value="60"';
         if ($options['gapp_cache'] == 60) echo ' SELECTED';
-        echo '>'.__('One hour', GAPP_TEXTDOMAIN).'</option>';
+        echo '>'.__('One hour', 'google-analytics-post-pageviews').'</option>';
 
         echo '<option value="360"';
         if ($options['gapp_cache'] == 360) echo ' SELECTED';
-        echo '>'.__('Six hours', GAPP_TEXTDOMAIN).'</option>';
+        echo '>'.__('Six hours', 'google-analytics-post-pageviews').'</option>';
 
         echo '<option value="720"';
         if ($options['gapp_cache'] == 720) echo ' SELECTED';
-        echo '>'.__('12 hours', GAPP_TEXTDOMAIN).'</option>';
+        echo '>'.__('12 hours', 'google-analytics-post-pageviews').'</option>';
 
         echo '<option value="1440"';
         if ($options['gapp_cache'] == 1440) echo ' SELECTED';
-        echo '>'.__('One day', GAPP_TEXTDOMAIN).'</option>';
+        echo '>'.__('One day', 'google-analytics-post-pageviews').'</option>';
 
         echo '<option value="10080"';
         if ($options['gapp_cache'] == 10080) echo ' SELECTED';
-        echo '>'.__('One week', GAPP_TEXTDOMAIN).'</option>';
+        echo '>'.__('One week', 'google-analytics-post-pageviews').'</option>';
 
         echo '<option value="20160"';
         if ($options['gapp_cache'] == 20160) echo ' SELECTED';
-        echo '>'.__('Two weeks', GAPP_TEXTDOMAIN).'</option>';
+        echo '>'.__('Two weeks', 'google-analytics-post-pageviews').'</option>';
 
         echo '</select></p>';
 
-        echo '<h3><label for="gapp_startdate">'.__('Start date for the analytics:', GAPP_TEXTDOMAIN).'</label></h3>';
+        echo '<h3><label for="gapp_startdate">'.__('Start date for the analytics:', 'google-analytics-post-pageviews').'</label></h3>';
         echo '<p><input type="text" id="gapp_startdate" name="gapp_startdate" value="'.$options['gapp_startdate'].'" /></p>';
 
         echo '<p class="submit" style="text-align: left">';
         wp_nonce_field('gapp', 'gapp-admin');
-        echo '<input type="submit" name="submit" value="'.__('Save', GAPP_TEXTDOMAIN).' &raquo;" /></p></form></div>';
+        echo '<input type="submit" name="submit" value="'.__('Save', 'google-analytics-post-pageviews').' &raquo;" /></p></form></div>';
 
     }
 
@@ -429,12 +449,6 @@ function gapp_conf() {
 function gapp_get_post_pageviews($ID = null, $format = true) {
 
     $options = get_option('gapp');
-
-	if (empty($options['gapp_token'])) {
-
-		return 0;
-
-	}
 
 	if ($ID) {
 
@@ -448,6 +462,15 @@ function gapp_get_post_pageviews($ID = null, $format = true) {
 
 	}
 
+    $namespaceKey = get_transient('gapp-namespace-key');
+
+    if ($namespaceKey === false) {
+        $namespaceKey = uniqid();
+        set_transient('gapp-namespace-key', $namespaceKey, YEAR_IN_SECONDS);
+    }
+
+    $gaTransName .= '-' . $namespaceKey;
+
     $totalResult = get_transient($gaTransName);
 
     if ($totalResult !== false) {
@@ -455,6 +478,12 @@ function gapp_get_post_pageviews($ID = null, $format = true) {
 	    return ($format) ? number_format_i18n($totalResult) : $totalResult;
 
     } else {
+
+        if (empty($options['gapp_token'])) {
+
+            return 0;
+
+        }
 
 	    if ($ID) {
 
@@ -495,7 +524,7 @@ function gapp_get_post_pageviews($ID = null, $format = true) {
 
         if (is_numeric($totalResult) && $totalResult > 0) {
 
-            set_transient($gaTransName, $totalResult, 60 * 60 * $options['gapp_cache']);
+            set_transient($gaTransName, $totalResult, 60 * $options['gapp_cache']);
 
             return ($format) ? number_format_i18n($totalResult) : $totalResult;
 
@@ -548,9 +577,13 @@ function gapp_admin_notice() {
 
 		if (isset($options['gapp_token']) && empty($options['gapp_token'])) {
 
-			echo '<div class="error"><p>'.__('Google Post Pageviews Warning: You have to (re)connect the plugin to your Google account.') . '<br><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG).'">'.__('Update settings', GAPP_TEXTDOMAIN).' &rarr;</a></p></div>';
+			echo '<div class="error"><p>'.__('Google Post Pageviews Warning: You have to (re)connect the plugin to your Google account.') . '<br><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG).'">'.__('Update settings', 'google-analytics-post-pageviews').' &rarr;</a></p></div>';
 
-		}
+		} elseif (isset($options['gapp_error']) && !empty($options['gapp_error'])) {
+
+            echo '<div class="error"><p>'.__('Google Post Pageviews Error: ') . $options['gapp_error'] . '<br><a href="'.admin_url('options-general.php?page=' . GAPP_SLUG).'">'.__('Update settings', 'google-analytics-post-pageviews').' &rarr;</a></p></div>';
+
+        }
 
 	}
 
@@ -558,6 +591,3 @@ function gapp_admin_notice() {
 
 // Admin notice
 add_action('admin_notices', 'gapp_admin_notice');
-
-// Add event
-add_action('gapp_refresh_token', 'gapp_refresh_token', 10, 2);
