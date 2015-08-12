@@ -3,7 +3,7 @@ Contributors: maximevalette
 Donate link: http://maxime.sh/paypal
 Tags: google, analytics, ga, post, pageviews, counter, visits
 Requires at least: 3.0
-Tested up to: 4.1
+Tested up to: 4.3
 Stable tag: 1.3.8
 
 Retrieves and displays the pageviews for each post by linking to your Google Analytics account.
